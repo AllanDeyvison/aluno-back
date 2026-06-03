@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require("express");
+const path = require('path');
 const bodyParser = require('body-parser');
 const db = require('../models/db');
 
@@ -17,19 +18,19 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 //Função CORS para a autorização do uso da API
 app.use(cors())
-app.get('/', (req, res)=> res.send('Estou aqui'))
+app.get('/', (req, res)=> res.send('API de alunos em execução'))
+
+// Servir arquivos enviados (fotos)
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')))
 
 async function start() {
 	await db.ensureDatabaseExists();
 
 	//importações das rotas
-	const proprietario = require('../controllers/ProprietarioControlls.js');
-	const veiculo = require('../controllers/VeiculoControlls.js');
-	const usuario = require('../controllers/UsuarioControlls.js');
+	const aluno = require('../controllers/UsuarioControlls.js');
 
-	app.use('/proprietario', proprietario);
-	app.use('/veiculo', veiculo);
-	app.use('/usuario', usuario);
+	app.use('/usuario', aluno);
+	app.use('/aluno', aluno);
 
 	await db.sequelize.authenticate();
 	await db.sequelize.sync();

@@ -1,26 +1,23 @@
 const db = require('./db');
 
-const Veiculo = db.sequelize.define('veiculo', {
-    id_veiculo: {
+const Post = db.sequelize.define('post', {
+    id_post: {
         type: db.Sequelize.INTEGER,
         autoIncrement: true,
         allowNull: false,
         primaryKey: true
     },
-    placa: {
-        type: db.Sequelize.STRING(10)
+    titulo: {
+        type: db.Sequelize.STRING(255)
     },
-    ano: {
-        type: db.Sequelize.INTEGER
+    conteudo: {
+        type: db.Sequelize.TEXT
     },
-    mensalidade: {
-        type: db.Sequelize.DECIMAL(10,2)
-    },
-    fk_proprietario: {
+    fk_tema: {
         type: db.Sequelize.INTEGER,
         references: {
-            model: 'proprietario',
-            key: 'id_proprietario'
+            model: 'tema',
+            key: 'id_tema'
         },
         onDelete: 'CASCADE',
         allowNull: false
@@ -30,4 +27,4 @@ const Veiculo = db.sequelize.define('veiculo', {
     timestamps: false
 });
 
-module.exports = Veiculo;
+module.exports = Post;

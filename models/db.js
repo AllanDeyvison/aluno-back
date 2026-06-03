@@ -9,7 +9,14 @@ const sequelize = new Sequelize(
     {
         host: process.env.DB_HOST,
         port: process.env.DB_PORT,
-        dialect: 'mysql'
+        dialect: 'mysql',
+        dialectOptions: process.env.DB_SSL === 'true'
+            ? {
+                ssl: {
+                    rejectUnauthorized: false
+                }
+            }
+            : {}
     }
 );
 
@@ -19,6 +26,11 @@ async function ensureDatabaseExists() {
         port: process.env.DB_PORT,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
+        ssl: process.env.DB_SSL === 'true'
+            ? {
+                rejectUnauthorized: false
+            }
+            : undefined,
     });
 
     try {

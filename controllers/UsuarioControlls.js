@@ -2,62 +2,117 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
+const multer = require('multer');
+const path = require('path');
 
-const Usuario = require('../models/Usuario');
+const Aluno = require('../models/Usuario');
+
+// configurar multer para salvar em /uploads
+const storage = multer.diskStorage({
+	destination: function (req, file, cb) {
+		cb(null, path.join(__dirname, '..', 'uploads'));
+	},
+	filename: function (req, file, cb) {
+		const ext = path.extname(file.originalname);
+		cb(null, Date.now() + '-' + file.fieldname + ext);
+	}
+});
+const upload = multer({ storage: storage });
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-function publicUser(usuario) {
+function publicAluno(aluno) {
 	return {
-		id_usuario: usuario.id_usuario,
-		nome: usuario.nome,
-		email: usuario.email,
+		id_aluno: aluno.id_aluno,
+		nome_completo: aluno.nome_completo,
+		usuario_acesso: aluno.usuario_acesso,
+		email_aluno: aluno.email_aluno,
+		observacao: aluno.observacao,
+		foto: aluno.foto,
+		data_cadastro: aluno.data_cadastro,
 	};
 }
 
 router.get('/', async (req, res) => {
-	const usuarios = await Usuario.findAll();
-	res.status(200).json(usuarios);
+	const alunos = await Aluno.findAll({
+		order: [['data_cadastro', 'DESC']],
+	});
+	res.status(200).json(alunos.map(publicAluno));
 });
 
 router.get('/:id', async (req, res) => {
-	const usuario = await Usuario.findByPk(req.params.id);
-	res.status(200).json(usuario);
+	const aluno = await Aluno.findByPk(req.params.id);
+	res.status(200).json(aluno ? publicAluno(aluno) : null);
 });
 
-router.post('/register', async (req, res) => {
-	const { nome, email, senha } = req.body || {};
+router.post('/register', upload.single('foto'), async (req, res) => {
+	const {
+		nome_completo,
+		usuario_acesso,
+		senha,
+		email_aluno,
+		observacao = null,
+	} = req.body || {};
 
-	if (!nome || !email || !senha) {
-		return res.status(400).json({ message: 'nome, email e senha são obrigatórios' });
+	// se enviou arquivo, gerar URL pública para salvar no DB
+	let foto = null;
+	if (req.file) {
+		foto = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+	} else if (req.body.foto) {
+		foto = req.body.foto; // aceitar também URL enviada
 	}
 
-	const existingUser = await Usuario.findOne({ where: { email } });
+	if (!nome_completo || !usuario_acesso || !senha || !email_aluno) {
+		return res.status(400).json({
+			message: 'nome_completo, usuario_acesso, senha e email_aluno são obrigatórios',
+		});
+	}
+
+	const existingUser = await Aluno.findOne({
+		where: {
+			[Op.or]: [{ usuario_acesso }, { email_aluno }],
+		},
+	});
 
 	if (existingUser) {
-		return res.status(409).json({ message: 'Usuário já cadastrado' });
+		return res.status(409).json({ message: 'Aluno já cadastrado' });
 	}
 
-	const hashedPassword = await bcrypt.hash(senha, 10);
-	const usuario = await Usuario.create({ nome, email, senha: hashedPassword });
+	const senha_hash = await bcrypt.hash(senha, 10);
+	const aluno = await Aluno.create({
+		nome_completo,
+		usuario_acesso,
+		senha_hash,
+		email_aluno,
+		observacao,
+		foto,
+	});
 
-	res.status(201).json({ message: 'Usuário cadastrado com sucesso', usuario: publicUser(usuario) });
+	res.status(201).json({ message: 'Aluno cadastrado com sucesso', aluno: publicAluno(aluno) });
 });
 
 router.post('/login', async (req, res) => {
-	const { email, senha } = req.body || {};
+	const { usuario_acesso, email_aluno, senha } = req.body || {};
 
-	if (!email || !senha) {
-		return res.status(400).json({ message: 'email e senha são obrigatórios' });
+	if ((!usuario_acesso && !email_aluno) || !senha) {
+		return res.status(400).json({ message: 'usuario_acesso ou email_aluno e senha são obrigatórios' });
 	}
 
-	const usuario = await Usuario.findOne({ where: { email } });
+	const aluno = await Aluno.findOne({
+		where: {
+			[Op.or]: [
+				usuario_acesso ? { usuario_acesso } : null,
+				email_aluno ? { email_aluno } : null,
+			].filter(Boolean),
+		},
+	});
 
-	if (!usuario) {
+	if (!aluno) {
 		return res.status(401).json({ message: 'Credenciais inválidas' });
 	}
 
-	const passwordMatches = await bcrypt.compare(senha, usuario.senha);
+	const passwordMatches = await bcrypt.compare(senha, aluno.senha_hash);
 
 	if (!passwordMatches) {
 		return res.status(401).json({ message: 'Credenciais inválidas' });
@@ -69,9 +124,10 @@ router.post('/login', async (req, res) => {
 
 	const token = jwt.sign(
 		{
-			id_usuario: usuario.id_usuario,
-			nome: usuario.nome,
-			email: usuario.email,
+			id_aluno: aluno.id_aluno,
+			nome_completo: aluno.nome_completo,
+			usuario_acesso: aluno.usuario_acesso,
+			email_aluno: aluno.email_aluno,
 		},
 		JWT_SECRET,
 		{ expiresIn: '7d' }
@@ -80,18 +136,73 @@ router.post('/login', async (req, res) => {
 	res.status(200).json({
 		message: 'Login realizado com sucesso',
 		token,
-		usuario: publicUser(usuario),
+		aluno: publicAluno(aluno),
 	});
 });
 
+router.put('/:id', upload.single('foto'), async (req, res) => {
+	const {
+		nome_completo,
+		usuario_acesso,
+		senha,
+		email_aluno,
+		observacao,
+	} = req.body || {};
+
+	let foto = undefined;
+	if (req.file) {
+		foto = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+	} else if (req.body.foto !== undefined) {
+		foto = req.body.foto;
+	}
+
+	const aluno = await Aluno.findByPk(req.params.id);
+
+	if (!aluno) {
+		return res.status(404).json({ message: 'Aluno não encontrado' });
+	}
+
+	if (usuario_acesso || email_aluno) {
+		const conflict = await Aluno.findOne({
+			where: {
+				id_aluno: { [Op.ne]: req.params.id },
+				[Op.or]: [
+					usuario_acesso ? { usuario_acesso } : null,
+					email_aluno ? { email_aluno } : null,
+				].filter(Boolean),
+			},
+		});
+
+		if (conflict) {
+			return res.status(409).json({ message: 'usuario_acesso ou email_aluno já cadastrado' });
+		}
+	}
+
+	const updates = {};
+
+	if (nome_completo !== undefined) updates.nome_completo = nome_completo;
+	if (usuario_acesso !== undefined) updates.usuario_acesso = usuario_acesso;
+	if (email_aluno !== undefined) updates.email_aluno = email_aluno;
+	if (observacao !== undefined) updates.observacao = observacao;
+	if (foto !== undefined) updates.foto = foto;
+	if (senha !== undefined) updates.senha_hash = await bcrypt.hash(senha, 10);
+
+	await Aluno.update(updates, {
+		where: { id_aluno: req.params.id },
+	});
+
+	const alunoAtualizado = await Aluno.findByPk(req.params.id);
+	res.status(200).json({ message: 'Aluno atualizado com sucesso', aluno: publicAluno(alunoAtualizado) });
+});
+
 router.delete('/:id', async (req, res) => {
-	await Usuario.destroy({
+	await Aluno.destroy({
 		where: {
-			id_usuario: req.params.id,
+			id_aluno: req.params.id,
 		},
 	});
 
-	res.status(200).json({ message: 'Usuário excluído com sucesso' });
+	res.status(200).json({ message: 'Aluno excluído com sucesso' });
 });
 
 module.exports = router;

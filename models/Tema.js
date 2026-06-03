@@ -1,7 +1,7 @@
 const db = require('./db');
 
-const Proprietario = db.sequelize.define('proprietario', {
-    id_proprietario: {
+const Tema = db.sequelize.define('tema', {
+    id_tema: {
         type: db.Sequelize.INTEGER,
         autoIncrement: true,
         allowNull: false,
@@ -10,12 +10,12 @@ const Proprietario = db.sequelize.define('proprietario', {
     nome: {
         type: db.Sequelize.STRING(255)
     },
-    cpf: {
-        type: db.Sequelize.STRING(14)
+    descricao: {
+        type: db.Sequelize.STRING(255)
     }
 }, {
     freezeTableName: true,
     timestamps: false
 });
 
-module.exports = Proprietario;
+module.exports = Tema;

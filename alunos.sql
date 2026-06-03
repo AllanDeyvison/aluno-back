@@ -1,0 +1,10 @@
+CREATE TABLE alunos (
+    id_aluno INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    nome_completo VARCHAR(150) NOT NULL,
+    usuario_acesso VARCHAR(50) NOT NULL UNIQUE,
+    senha_hash VARCHAR(255) NOT NULL,
+    email_aluno VARCHAR(150) NOT NULL UNIQUE,
+    observacao VARCHAR(500) NULL,
+    foto VARCHAR(255) NULL,
+    data_cadastro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
